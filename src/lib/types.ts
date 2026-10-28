@@ -16,6 +16,15 @@ export interface ScoreNote {
 
 export type IdeaKind = 'text' | 'voice' | 'musical';
 
+/** A text note anchored to a moment in the audio/melody timeline. */
+export interface IdeaMarker {
+  id: string;
+  atMs: number;
+  text: string;
+  /** Created automatically by speech-to-text. */
+  auto?: boolean;
+}
+
 export interface Idea {
   id: string;
   title: string;
@@ -25,6 +34,7 @@ export interface Idea {
   tags: string[];
   category: string;
   melody: NoteEvent[] | null;
+  markers: IdeaMarker[] | null;
   reminderAt: string | null;
   reminderNotificationId: string | null;
   calendarEventId: string | null;
@@ -41,7 +51,7 @@ export interface IdeaDraft {
 }
 
 export function ideaKind(idea: Idea): IdeaKind {
-  if (idea.melody && idea.melody.length > 0) return 'musical';
+  if (!idea.audioUri && idea.melody && idea.melody.length > 0) return 'musical';
   if (idea.audioUri) return 'voice';
   return 'text';
 }

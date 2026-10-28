@@ -11,6 +11,7 @@ import { Chip } from '@/components/chips';
 import { melodyDurationMs, playMelody, playPitch, type CancelPlayback } from '@/lib/piano-engine';
 import { buildPitch, NOTE_DURATIONS, toNoteEvents, type Accidental } from '@/lib/melody';
 import { ensureNotificationSetup, notificationsUnsupportedReason, scheduleIdeaReminder } from '@/lib/notifications';
+import { shareMusicXml } from '@/lib/musicxml-export';
 import { useIdeaStore } from '@/lib/store';
 import { radius, useTheme, type ThemeColors } from '@/lib/theme';
 import type { IdeaDraft, Idea, NoteEvent, ScoreNote } from '@/lib/types';
@@ -282,6 +283,14 @@ export default function MelodyScreen() {
                   <Text style={styles.melodyMeta}>
                     {idea.melody?.length} notes · {Math.round(melodyDurationMs(idea.melody ?? []) / 100) / 10}s
                   </Text>
+                </Pressable>
+                <Pressable
+                  hitSlop={8}
+                  onPress={() => {
+                    shareMusicXml(idea);
+                  }}
+                >
+                  <Ionicons name="share-outline" size={17} color={t.textDim} />
                 </Pressable>
                 <Ionicons name="chevron-forward" size={16} color={t.textFaint} />
               </View>

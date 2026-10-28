@@ -26,7 +26,11 @@ export function IdeaCard({ idea, onPress, onLongPress }: IdeaCardProps) {
 
   let snippet: string;
   if (kind === 'voice') {
-    snippet = `Voice note · ${formatClock(idea.audioDurationMs ?? 0)}`;
+    if (idea.melody && idea.melody.length > 0) {
+      snippet = `Voice + melody · ${idea.melody.length} notes`;
+    } else {
+      snippet = `Voice note · ${formatClock(idea.audioDurationMs ?? 0)}`;
+    }
   } else if (kind === 'musical') {
     snippet = `Melody · ${idea.melody?.length ?? 0} notes`;
   } else {

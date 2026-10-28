@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -17,14 +18,15 @@ import { IdeaMetaForm } from '@/components/idea-meta-form';
 import { ReminderPicker } from '@/components/reminder-picker';
 import { TagPill } from '@/components/chips';
 import { SheetMusic } from '@/components/sheet-music';
-import { formatClock, formatReminder, inHours } from '@/lib/format';
+import { formatClock, formatReminder, inHours, uid } from '@/lib/format';
 import { addIdeaToCalendar, ensureCalendarPermission, getWritableCalendars, type CalendarOption } from '@/lib/calendar';
-import { playMelody, playPitch, type CancelPlayback } from '@/lib/piano-engine';
+import { playMelody, playMelodyFrom, playPitch, type CancelPlayback } from '@/lib/piano-engine';
 import type { PitchName } from '@/lib/note-sources';
 import { cancelReminder, ensureNotificationSetup, notificationsUnsupportedReason, scheduleIdeaReminder } from '@/lib/notifications';
+import { shareMusicXml } from '@/lib/musicxml-export';
 import { useIdeaStore } from '@/lib/store';
 import { categoryColor, radius, useTheme, type ThemeColors } from '@/lib/theme';
-import { ideaKind, type IdeaDraft } from '@/lib/types';
+import { ideaKind, type IdeaDraft, type IdeaMarker } from '@/lib/types';
 
 export default function IdeaDetailScreen() {
   const t = useTheme();
@@ -43,6 +45,7 @@ export default function IdeaDetailScreen() {
   const [calendars, setCalendars] = useState<CalendarOption[] | null>(null);
   const [calendarModal, setCalendarModal] = useState(false);
   const [addingToCalendar, setAddingToCalendar] = useState(false);
+  const [markerInput, setMarkerInput] = useState<string>('');
 
   const cancelPlaybackRef = useRef<CancelPlayback | null>(null);
   const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -97,6 +100,39 @@ export default function IdeaDetailScreen() {
   const tapNote = (pitch: PitchName) => {
     playPitch(pitch);
     flashKey(pitch);
+  };
+
+  const markers = [...(idea?.markers ?? [])].sort((a, b) => a.atMs - b.atMs);
+
+  const playMarker = (marker: IdeaMarker) => {
+    if (!idea) return;
+    if (idea.audioUri) {
+      try {
+        player.seekTo(marker.atMs / 1000);
+        player.play();
+      } catch {}
+    } else if (idea.melody?.length) {
+      cancelPlaybackRef.current?.();
+      setPlayingMelody(true);
+      cancelPlaybackRef.current = playMelodyFrom(idea.melody, marker.atMs, flashKey, () => {
+        setPlayingMelody(false);
+        setActivePitch(null);
+      });
+    }
+  };
+
+  const addMarkerHere = () => {
+    if (!idea) return;
+    const text = markerInput.trim();
+    if (!text) return;
+    const atMs = idea.audioUri ? Math.round(status.currentTime * 1000) : 0;
+    updateIdea(idea.id, { markers: [...(idea.markers ?? []), { id: uid(), atMs, text }] });
+    setMarkerInput('');
+  };
+
+  const removeMarker = (markerId: string) => {
+    if (!idea) return;
+    updateIdea(idea.id, { markers: (idea.markers ?? []).filter((m) => m.id !== markerId) });
   };
 
   const togglePlayAudio = () => {
@@ -259,7 +295,7 @@ export default function IdeaDetailScreen() {
               ) : null}
             </View>
 
-            {kind === 'voice' ? (
+            {idea.audioUri ? (
               <View style={styles.sectionCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <Pressable style={styles.playButton} onPress={togglePlayAudio}>
@@ -279,7 +315,7 @@ export default function IdeaDetailScreen() {
               </View>
             ) : null}
 
-            {kind === 'musical' && idea.melody ? (
+            {idea.melody && idea.melody.length > 0 ? (
               <View style={styles.sectionCard}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <Pressable style={[styles.playButton, { backgroundColor: t.teal }]} onPress={toggleMelody}>
@@ -298,6 +334,56 @@ export default function IdeaDetailScreen() {
                     activePitch={activePitch}
                     onPressNote={(index) => tapNote(idea.melody?.[index]?.pitch as PitchName)}
                   />
+                </View>
+              </View>
+            ) : null}
+
+            {markers.length > 0 ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionCardTitle}>Synced notes</Text>
+                <Text style={styles.sectionCardSub}>Tap a note to jump to that moment</Text>
+                <View style={{ marginTop: 6 }}>
+                  {markers.map((marker) => (
+                    <View key={marker.id} style={styles.markerRow}>
+                      <Pressable style={styles.markerPlay} onPress={() => playMarker(marker)} hitSlop={4}>
+                        <Text style={styles.markerAt}>{formatClock(marker.atMs)}</Text>
+                      </Pressable>
+                      <Text style={styles.markerBody} numberOfLines={3}>
+                        {marker.text}
+                      </Text>
+                      <Ionicons
+                        name="close"
+                        size={15}
+                        color={t.textFaint}
+                        onPress={() => removeMarker(marker.id)}
+                        hitSlop={8}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {idea.audioUri || idea.melody?.length ? (
+              <View style={styles.sectionCard}>
+                <Text style={styles.sectionCardTitle}>Add synced note</Text>
+                <View style={styles.markerInputRow}>
+                  <TextInput
+                    style={styles.markerInput}
+                    placeholder={
+                      idea.audioUri
+                        ? `Note at ${formatClock(status.currentTime * 1000)}…`
+                        : 'Attach a note to the start…'
+                    }
+                    placeholderTextColor={t.textFaint}
+                    value={markerInput}
+                    onChangeText={setMarkerInput}
+                    onSubmitEditing={addMarkerHere}
+                    returnKeyType="done"
+                  />
+                  <Pressable style={styles.markerAddButton} onPress={addMarkerHere}>
+                    <Ionicons name="bookmark" size={15} color={t.onAccent} />
+                  </Pressable>
                 </View>
               </View>
             ) : null}
@@ -336,6 +422,17 @@ export default function IdeaDetailScreen() {
             </Pressable>
             {idea.calendarEventId ? (
               <Text style={styles.calendarHint}>✓ This idea was added to your calendar</Text>
+            ) : null}
+
+            {kind === 'musical' ? (
+              <>
+                <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Sheet music</Text>
+                <Pressable style={styles.calendarButton} onPress={() => shareMusicXml(idea)}>
+                  <Ionicons name="document-outline" size={18} color={t.accent} />
+                  <Text style={styles.calendarButtonText}>Export as MusicXML</Text>
+                </Pressable>
+                <Text style={styles.calendarHint}>Opens in MuseScore, Finale, Sibelius…</Text>
+              </>
             ) : null}
           </>
         )}
@@ -521,6 +618,57 @@ const makeStyles = (t: ThemeColors) =>
       fontSize: 12,
       fontWeight: '600',
       marginTop: 8,
+    },
+    markerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 7,
+      borderBottomWidth: 1,
+      borderBottomColor: t.borderSoft,
+    },
+    markerPlay: {
+      backgroundColor: t.accentSoft,
+      borderRadius: radius.sm,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+    markerAt: {
+      color: t.accent,
+      fontSize: 11,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    markerBody: {
+      flex: 1,
+      color: t.textDim,
+      fontSize: 13,
+      lineHeight: 18,
+    },
+    markerInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 8,
+    },
+    markerInput: {
+      flex: 1,
+      backgroundColor: t.bgSoft,
+      borderWidth: 1,
+      borderColor: t.borderSoft,
+      borderRadius: radius.full,
+      color: t.text,
+      fontSize: 13,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    markerAddButton: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: t.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     modalOverlay: {
       flex: 1,

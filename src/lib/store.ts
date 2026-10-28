@@ -2,13 +2,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { DEFAULT_CATEGORIES } from './theme';
-import type { Idea, IdeaDraft } from './types';
+import type { Idea, IdeaDraft, IdeaMarker } from './types';
 import { uid } from './format';
 
 interface IdeaState {
   ideas: Idea[];
   categories: string[];
-  addIdea: (draft: Partial<IdeaDraft> & { audioUri?: string | null; audioDurationMs?: number | null; melody?: Idea['melody'] | null }) => Idea;
+  addIdea: (draft: Partial<IdeaDraft> & {
+    audioUri?: string | null;
+    audioDurationMs?: number | null;
+    melody?: Idea['melody'] | null;
+    markers?: IdeaMarker[] | null;
+  }) => Idea;
   updateIdea: (id: string, patch: Partial<Idea>) => void;
   deleteIdea: (id: string) => void;
   toggleFavorite: (id: string) => void;
@@ -35,6 +40,7 @@ export const useIdeaStore = create<IdeaState>()(
           tags: draft.tags ?? [],
           category: draft.category || 'Spark',
           melody: draft.melody ?? null,
+          markers: draft.markers ?? null,
           reminderAt: null,
           reminderNotificationId: null,
           calendarEventId: null,

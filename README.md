@@ -13,6 +13,9 @@ A modern React Native (Expo) app for capturing ideas the moment they strike — 
 | 5 | **Google / iOS calendar** | One tap adds the idea to any writable device calendar (`expo-calendar`). Google-account calendars are detected and badged. Uses the native "add event" form so you can tweak before saving. |
 | 6 | **Musical ideas** | Any idea can be a melody instead of words. |
 | 7 | **Playable piano** | The *Melody* tab is a note composer: pick a letter (♯/♭), octave and duration (1/1 – 1/16) and notes are written onto a real 5-line staff as musical symbols. One tap plays the whole score back using bundled piano samples — the piano is the sound, notes are the input. |
+| + | **One-tap capture** | The *Record* tab captures everything at once: your **voice audio**, the **hummed melody** (live on-device pitch detection turns your humming into notes, shown in real time), and **speech-to-text** transcription. Type quick notes while recording too. |
+| + | **Audio-text sync** | Notes are anchored to the timeline (auto markers from recognized speech, or manual bookmarks while recording / at the playhead). On the idea screen, tap any synced note to jump the audio — or the melody playback — straight to that moment. |
+| + | **MusicXML export** | Share any melody as a standard `.musicxml` file (4/4, treble clef, ties across barlines handled) from the *Melody* tab or the idea detail screen — opens directly in MuseScore, Finale, Sibelius, flat.io… |
 | + | **Text ideas** | The *Write* tab is a dedicated screen for typing ideas — title, notes, tags, category and reminder, no microphone needed. |
 | + | **Light & Dark Modern themes** | Moon icon in the *Ideas* header: pick **Dark Modern**, **Light Modern**, or follow the system. Preference is remembered. |
 
@@ -45,12 +48,14 @@ npm install
 npx expo start          # press a (Android) or i (iOS)
 ```
 
-- Voice recording, piano playback, tags, categories and search all work in **Expo Go**.
-- **Calendar integration requires a development build** (`expo-calendar` is not available in Expo Go):
+- Voice recording, piano playback, tags, categories, search, one-tap capture with melody detection all work in **Expo Go**.
+- **Speech-to-text** (`expo-speech-recognition`) and **calendar integration** (`expo-calendar`) require a development build — these native modules are not part of Expo Go:
 
 ```bash
 npx expo run:android    # or: npx expo run:ios
 ```
+
+In Expo Go, those features degrade gracefully (typed notes instead of STT) instead of crashing.
 
 - Reminders: local notifications work on device; grant the notification permission when asked.
 - Regenerate piano samples any time: `npm run notes:generate`.

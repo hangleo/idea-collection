@@ -41,16 +41,32 @@ export function playMelody(
   onNote?: (pitch: string) => void,
   onDone?: () => void,
 ): CancelPlayback {
+  return playMelodyFrom(notes, 0, onNote, onDone);
+}
+
+/** Plays a melody starting at `fromMs`, keeping the original spacing. */
+export function playMelodyFrom(
+  notes: NoteEvent[],
+  fromMs: number,
+  onNote?: (pitch: string) => void,
+  onDone?: () => void,
+): CancelPlayback {
   const timers: ReturnType<typeof setTimeout>[] = [];
-  for (const note of notes) {
+  const remaining = notes.filter((n) => n.startMs + n.durationMs > fromMs);
+  for (const note of remaining) {
+    const delay = Math.max(0, note.startMs - fromMs);
     timers.push(
       setTimeout(() => {
         playPitch(note.pitch);
         onNote?.(note.pitch);
-      }, note.startMs),
+      }, delay),
     );
   }
-  timers.push(setTimeout(() => onDone?.(), melodyDurationMs(notes) + 120));
+  const total = remaining.reduce(
+    (max, n) => Math.max(max, Math.max(0, n.startMs - fromMs) + n.durationMs),
+    0,
+  );
+  timers.push(setTimeout(() => onDone?.(), total + 120));
   return () => timers.forEach(clearTimeout);
 }
 
